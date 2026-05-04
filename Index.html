@@ -1085,6 +1085,15 @@
         <p class="page-description">View and manage all fleet bookings</p>
       </div>
 
+      <!-- ADMIN STATUS BAR (shown only when logged in as admin) -->
+      <div id="admin-status-bar" style="display:none;background:var(--primary);color:white;border-radius:12px;padding:12px 20px;margin-bottom:20px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;">
+          <span>🔐</span>
+          <span>Logged in as Admin: <span id="admin-logged-email" style="font-weight:400;opacity:0.9;"></span></span>
+        </div>
+        <button onclick="adminLogout()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600;">Logout</button>
+      </div>
+
       <!-- FILTERS -->
       <div class="filters-card">
         <div class="filters-grid">
@@ -1124,6 +1133,30 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- ADMIN LOGIN MODAL -->
+  <div id="admin-login-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width:420px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="width:56px;height:56px;background:var(--primary);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;">🔒</div>
+        <h3 style="margin-bottom:6px;">Admin Login</h3>
+        <p style="margin-bottom:0;font-size:14px;color:var(--text-muted);">Enter your admin email and PIN to manage bookings</p>
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label" for="admin-email-input">Admin Email</label>
+        <input type="email" id="admin-email-input" class="form-input" placeholder="you@axicom.my"
+               onkeydown="if(event.key==='Enter')document.getElementById('admin-pin-input').focus()">
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label" for="admin-pin-input">PIN</label>
+        <input type="password" id="admin-pin-input" class="form-input" placeholder="Enter admin PIN"
+               onkeydown="if(event.key==='Enter')adminLogin()">
+      </div>
+      <p id="admin-login-error" style="color:var(--error);font-size:13px;min-height:20px;margin-bottom:16px;"></p>
+      <button id="admin-login-btn" onclick="adminLogin()" class="btn-primary" style="width:100%;margin-bottom:12px;">Login</button>
+      <button onclick="closeAdminLogin()" style="width:100%;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;">Cancel</button>
+    </div>
   </div>
 
   <!-- MODAL -->
@@ -1167,8 +1200,70 @@
       } else if (page === 'admin') {
         document.getElementById('admin-page').classList.add('active');
         document.querySelector('.nav-tab:last-child').classList.add('active');
-        loadBookings();
+        if (isAdmin) {
+          loadBookings();
+        } else {
+          // Show login modal; reveal page content only after successful login
+          document.getElementById('admin-login-error').textContent = '';
+          document.getElementById('admin-email-input').value = '';
+          document.getElementById('admin-pin-input').value = '';
+          document.getElementById('admin-login-modal').classList.add('open');
+          setTimeout(() => document.getElementById('admin-email-input').focus(), 100);
+        }
       }
+    }
+
+    function adminLogin() {
+      const email = document.getElementById('admin-email-input').value.trim();
+      const pin   = document.getElementById('admin-pin-input').value;
+      const errEl = document.getElementById('admin-login-error');
+      const btn   = document.getElementById('admin-login-btn');
+
+      if (!email || !pin) {
+        errEl.textContent = 'Please enter your email and PIN.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying…';
+      errEl.textContent = '';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'Login';
+          if (result.success) {
+            isAdmin = true;
+            document.getElementById('admin-login-modal').classList.remove('open');
+            const bar = document.getElementById('admin-status-bar');
+            bar.style.display = 'flex';
+            document.getElementById('admin-logged-email').textContent = email;
+            loadBookings();
+          } else {
+            errEl.textContent = result.message;
+            document.getElementById('admin-pin-input').value = '';
+            document.getElementById('admin-pin-input').focus();
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Login';
+          errEl.textContent = 'Error: ' + err.message;
+        })
+        .verifyAdminPin(email, pin);
+    }
+
+    function closeAdminLogin() {
+      document.getElementById('admin-login-modal').classList.remove('open');
+      // Navigate back to booking page if admin was not authenticated
+      if (!isAdmin) switchPage('booking');
+    }
+
+    function adminLogout() {
+      isAdmin = false;
+      document.getElementById('admin-status-bar').style.display = 'none';
+      document.getElementById('admin-logged-email').textContent = '';
+      switchPage('booking');
     }
 
     function selectVehicle(name, plate, imgSrc) {

@@ -258,6 +258,17 @@ function sendApprovalEmail(id, data) {
   GmailApp.sendEmail(ADMIN_EMAILS, "Action Required: " + id, "", {htmlBody: html, cc: CC_EMAILS});
 }
 
+function verifyAdminPin(email, pin) {
+  if (!email || !pin) return {success: false, message: "Email and PIN are required."};
+  var adminList = ADMIN_EMAILS.split(",").map(function(e) { return e.trim().toLowerCase(); });
+  var storedPin = PropertiesService.getScriptProperties().getProperty("ADMIN_PIN");
+  // Generic failure message to avoid leaking whether the email or PIN was wrong
+  var fail = {success: false, message: "Incorrect email or PIN. Please try again."};
+  if (adminList.indexOf(email.trim().toLowerCase()) === -1) return fail;
+  if (!storedPin || pin !== storedPin) return fail;
+  return {success: true, message: "Login successful."};
+}
+
 function getCurrentUserEmail() {
   var email = Session.getActiveUser().getEmail();
   var adminList = ADMIN_EMAILS.split(",").map(function(e) { return e.trim().toLowerCase(); });
