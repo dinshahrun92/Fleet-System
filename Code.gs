@@ -258,33 +258,94 @@ function sendApprovalEmail(id, data) {
   GmailApp.sendEmail(ADMIN_EMAILS, "Action Required: " + id, "", {htmlBody: html, cc: CC_EMAILS});
 }
 
-function verifyAdminPin(email, pin) {
-  if (!email || !pin) return {success: false, message: "Email and PIN are required."};
-  var adminList = ADMIN_EMAILS.split(",").map(function(e) { return e.trim().toLowerCase(); });
-  var storedPin = PropertiesService.getScriptProperties().getProperty("ADMIN_PIN");
-  // Generic failure message to avoid leaking whether the email or PIN was wrong
-  var fail = {success: false, message: "Incorrect email or PIN. Please try again."};
-  if (adminList.indexOf(email.trim().toLowerCase()) === -1) return fail;
-  if (!storedPin || pin !== storedPin) return fail;
-  return {success: true, message: "Login successful."};
+const ADMIN_SHEET_NAME = "Admins";
+
+// ---------- helpers ----------
+
+function _hashPasswordWithSalt(password, salt) {
+  // Iterated SHA-256 with a per-user salt (PBKDF2-style)
+  var input = salt + password;
+  for (var i = 0; i < 10000; i++) {
+    var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input);
+    input = bytes.map(function(b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
+  }
+  return input;
+}
+
+function _getAdminSheet() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(ADMIN_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(ADMIN_SHEET_NAME);
+    // Columns: Email | Salt | PasswordHash | Name | RegisteredAt
+    sheet.appendRow(["Email", "Salt", "PasswordHash", "Name", "RegisteredAt"]);
+  }
+  return sheet;
+}
+
+function _generateToken() {
+  return Utilities.getUuid();
+}
+
+// ---------- admin auth ----------
+
+function adminRegister(email, password, name) {
+  if (!email || !password || !name) return {success: false, message: "All fields are required."};
+  email = email.trim().toLowerCase();
+  var sheet = _getAdminSheet();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim().toLowerCase() === email) {
+      return {success: false, message: "An account with this email already exists."};
+    }
+  }
+  var salt = _generateToken(); // unique per user
+  var hash = _hashPasswordWithSalt(password, salt);
+  sheet.appendRow([email, salt, hash, name.trim(), new Date()]);
+  return {success: true, message: "Registration successful. You can now log in."};
+}
+
+function adminLoginWithPassword(email, password) {
+  if (!email || !password) return {success: false, message: "Email and password are required."};
+  email = email.trim().toLowerCase();
+  var sheet = _getAdminSheet();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim().toLowerCase() === email) {
+      var salt = String(data[i][1]);
+      var storedHash = String(data[i][2]);
+      if (_hashPasswordWithSalt(password, salt) === storedHash) {
+        var token = _generateToken();
+        CacheService.getScriptCache().put("admin_token_" + token, email, 7200); // 2 hours
+        return {success: true, token: token, name: String(data[i][3])};
+      }
+      break;
+    }
+  }
+  return {success: false, message: "Incorrect email or password."};
+}
+
+function adminLogoutSession(token) {
+  if (token) CacheService.getScriptCache().remove("admin_token_" + token);
+  return {success: true};
+}
+
+function verifyAdminSession(token) {
+  if (!token) return null;
+  return CacheService.getScriptCache().get("admin_token_" + token);
 }
 
 function getCurrentUserEmail() {
   var email = Session.getActiveUser().getEmail();
-  var adminList = ADMIN_EMAILS.split(",").map(function(e) { return e.trim().toLowerCase(); });
-  return {
-    email: email,
-    isAdmin: !!(email && adminList.indexOf(email.toLowerCase()) !== -1)
-  };
+  return { email: email };
 }
 
-function approveRequestInApp(id, action) {
-  var userEmail = Session.getActiveUser().getEmail();
-  var adminList = ADMIN_EMAILS.split(",").map(function(e) { return e.trim().toLowerCase(); });
-  if (!userEmail || adminList.indexOf(userEmail.toLowerCase()) === -1) {
-    return {success: false, message: "Unauthorized: only admins can approve or reject requests."};
+function approveRequestInApp(id, action, sessionToken) {
+  var adminEmail = verifyAdminSession(sessionToken);
+  if (!adminEmail) {
+    return {success: false, message: "Session expired or unauthorized. Please log in again."};
   }
-  var result = processApproval(id, action, userEmail);
+  var result = processApproval(id, action, adminEmail);
   var succeeded = result && (result.indexOf("APPROVED") !== -1 || result.indexOf("REJECTED") !== -1);
   return {success: succeeded, message: result};
 }

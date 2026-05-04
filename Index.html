@@ -1089,7 +1089,7 @@
       <div id="admin-status-bar" style="display:none;background:var(--primary);color:white;border-radius:12px;padding:12px 20px;margin-bottom:20px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;">
           <span>🔐</span>
-          <span>Logged in as Admin: <span id="admin-logged-email" style="font-weight:400;opacity:0.9;"></span></span>
+          <span>Admin: <span id="admin-logged-name" style="font-weight:400;opacity:0.9;"></span></span>
         </div>
         <button onclick="adminLogout()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600;">Logout</button>
       </div>
@@ -1122,8 +1122,15 @@
 
       <!-- RECORDS TABLE -->
       <div class="records-card">
-        <div class="records-header">
+        <div class="records-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div class="records-title">All Bookings</div>
+          <div id="admin-header-action">
+            <button id="admin-login-link-btn" onclick="openAdminModal('login')"
+              style="display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--border);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);transition:all 0.2s;"
+              onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='none'">
+              🔒 Admin Login
+            </button>
+          </div>
         </div>
         <div id="records-content" class="records-content">
           <div class="loading">
@@ -1135,27 +1142,70 @@
     </main>
   </div>
 
-  <!-- ADMIN LOGIN MODAL -->
-  <div id="admin-login-modal" class="modal-overlay">
+  <!-- ADMIN AUTH MODAL (Login + Register) -->
+  <div id="admin-auth-modal" class="modal-overlay" onclick="if(event.target===this)closeAdminModal()">
     <div class="modal-content" style="max-width:420px;">
-      <div style="text-align:center;margin-bottom:24px;">
-        <div style="width:56px;height:56px;background:var(--primary);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;">🔒</div>
-        <h3 style="margin-bottom:6px;">Admin Login</h3>
-        <p style="margin-bottom:0;font-size:14px;color:var(--text-muted);">Enter your admin email and PIN to manage bookings</p>
+
+      <!-- LOGIN VIEW -->
+      <div id="admin-login-view">
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="width:56px;height:56px;background:var(--primary);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:26px;">🔒</div>
+          <h3 style="margin-bottom:6px;">Admin Login</h3>
+          <p style="margin-bottom:0;font-size:14px;color:var(--text-muted);">Login to approve or reject bookings</p>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label" for="al-email">Email</label>
+          <input type="email" id="al-email" class="form-input" placeholder="admin@axicom.my"
+                 onkeydown="if(event.key==='Enter')document.getElementById('al-password').focus()">
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label" for="al-password">Password</label>
+          <input type="password" id="al-password" class="form-input" placeholder="Enter your password"
+                 onkeydown="if(event.key==='Enter')doAdminLogin()">
+        </div>
+        <p id="al-error" style="color:var(--error);font-size:13px;min-height:18px;margin-bottom:14px;"></p>
+        <button id="al-btn" onclick="doAdminLogin()" class="btn-primary" style="width:100%;margin-bottom:14px;">Login</button>
+        <p style="text-align:center;font-size:13px;color:var(--text-muted);">
+          Don't have an account?
+          <a href="#" onclick="showAdminView('register');return false;" style="color:var(--primary);font-weight:600;text-decoration:none;">Register here</a>
+        </p>
       </div>
-      <div class="form-group" style="margin-bottom:16px;">
-        <label class="form-label" for="admin-email-input">Admin Email</label>
-        <input type="email" id="admin-email-input" class="form-input" placeholder="you@axicom.my"
-               onkeydown="if(event.key==='Enter')document.getElementById('admin-pin-input').focus()">
+
+      <!-- REGISTER VIEW -->
+      <div id="admin-register-view" style="display:none;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="width:56px;height:56px;background:var(--primary);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:26px;">✍️</div>
+          <h3 style="margin-bottom:6px;">Admin Register</h3>
+          <p style="margin-bottom:0;font-size:14px;color:var(--text-muted);">Create your admin account</p>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" for="ar-name">Full Name</label>
+          <input type="text" id="ar-name" class="form-input" placeholder="Your name"
+                 onkeydown="if(event.key==='Enter')document.getElementById('ar-email').focus()">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" for="ar-email">Email</label>
+          <input type="email" id="ar-email" class="form-input" placeholder="admin@axicom.my"
+                 onkeydown="if(event.key==='Enter')document.getElementById('ar-password').focus()">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" for="ar-password">Password</label>
+          <input type="password" id="ar-password" class="form-input" placeholder="Min 8 chars, uppercase &amp; number"
+                 onkeydown="if(event.key==='Enter')document.getElementById('ar-confirm').focus()">
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label" for="ar-confirm">Confirm Password</label>
+          <input type="password" id="ar-confirm" class="form-input" placeholder="Repeat your password"
+                 onkeydown="if(event.key==='Enter')doAdminRegister()">
+        </div>
+        <p id="ar-error" style="color:var(--error);font-size:13px;min-height:18px;margin-bottom:14px;"></p>
+        <button id="ar-btn" onclick="doAdminRegister()" class="btn-primary" style="width:100%;margin-bottom:14px;">Register</button>
+        <p style="text-align:center;font-size:13px;color:var(--text-muted);">
+          Already have an account?
+          <a href="#" onclick="showAdminView('login');return false;" style="color:var(--primary);font-weight:600;text-decoration:none;">Login here</a>
+        </p>
       </div>
-      <div class="form-group" style="margin-bottom:8px;">
-        <label class="form-label" for="admin-pin-input">PIN</label>
-        <input type="password" id="admin-pin-input" class="form-input" placeholder="Enter admin PIN"
-               onkeydown="if(event.key==='Enter')adminLogin()">
-      </div>
-      <p id="admin-login-error" style="color:var(--error);font-size:13px;min-height:20px;margin-bottom:16px;"></p>
-      <button id="admin-login-btn" onclick="adminLogin()" class="btn-primary" style="width:100%;margin-bottom:12px;">Login</button>
-      <button onclick="closeAdminLogin()" style="width:100%;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;">Cancel</button>
+
     </div>
   </div>
 
@@ -1181,14 +1231,8 @@
     let currentPage = 1;
     const recordsPerPage = 5;
     let isAdmin = false;
-
-    // Check whether the currently logged-in user is an admin as soon as the page loads.
-    google.script.run
-      .withSuccessHandler(function(result) {
-        isAdmin = !!(result && result.isAdmin);
-      })
-      .withFailureHandler(function() { isAdmin = false; })
-      .getCurrentUserEmail();
+    let adminSessionToken = null;
+    let adminName = '';
 
     function switchPage(page) {
       document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
@@ -1200,29 +1244,41 @@
       } else if (page === 'admin') {
         document.getElementById('admin-page').classList.add('active');
         document.querySelector('.nav-tab:last-child').classList.add('active');
-        if (isAdmin) {
-          loadBookings();
-        } else {
-          // Show login modal; reveal page content only after successful login
-          document.getElementById('admin-login-error').textContent = '';
-          document.getElementById('admin-email-input').value = '';
-          document.getElementById('admin-pin-input').value = '';
-          document.getElementById('admin-login-modal').classList.add('open');
-          setTimeout(() => document.getElementById('admin-email-input').focus(), 100);
-        }
+        loadBookings();
       }
     }
 
-    function adminLogin() {
-      const email = document.getElementById('admin-email-input').value.trim();
-      const pin   = document.getElementById('admin-pin-input').value;
-      const errEl = document.getElementById('admin-login-error');
-      const btn   = document.getElementById('admin-login-btn');
+    // ---------- Admin auth modal ----------
 
-      if (!email || !pin) {
-        errEl.textContent = 'Please enter your email and PIN.';
-        return;
-      }
+    function openAdminModal(view) {
+      document.getElementById('al-error').textContent = '';
+      document.getElementById('ar-error').textContent = '';
+      showAdminView(view || 'login');
+      document.getElementById('admin-auth-modal').classList.add('open');
+      setTimeout(() => {
+        const f = view === 'register' ? document.getElementById('ar-name') : document.getElementById('al-email');
+        if (f) f.focus();
+      }, 100);
+    }
+
+    function closeAdminModal() {
+      document.getElementById('admin-auth-modal').classList.remove('open');
+    }
+
+    function showAdminView(view) {
+      document.getElementById('admin-login-view').style.display    = view === 'login'    ? '' : 'none';
+      document.getElementById('admin-register-view').style.display = view === 'register' ? '' : 'none';
+      document.getElementById('al-error').textContent = '';
+      document.getElementById('ar-error').textContent = '';
+    }
+
+    function doAdminLogin() {
+      const email    = document.getElementById('al-email').value.trim();
+      const password = document.getElementById('al-password').value;
+      const errEl    = document.getElementById('al-error');
+      const btn      = document.getElementById('al-btn');
+
+      if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; return; }
 
       btn.disabled = true;
       btn.textContent = 'Verifying…';
@@ -1234,15 +1290,20 @@
           btn.textContent = 'Login';
           if (result.success) {
             isAdmin = true;
-            document.getElementById('admin-login-modal').classList.remove('open');
+            adminSessionToken = result.token;
+            adminName = result.name || email;
+            closeAdminModal();
+            document.getElementById('al-email').value = '';
+            document.getElementById('al-password').value = '';
             const bar = document.getElementById('admin-status-bar');
             bar.style.display = 'flex';
-            document.getElementById('admin-logged-email').textContent = email;
-            loadBookings();
+            document.getElementById('admin-logged-name').textContent = adminName;
+            document.getElementById('admin-login-link-btn').style.display = 'none';
+            renderTable();
           } else {
             errEl.textContent = result.message;
-            document.getElementById('admin-pin-input').value = '';
-            document.getElementById('admin-pin-input').focus();
+            document.getElementById('al-password').value = '';
+            document.getElementById('al-password').focus();
           }
         })
         .withFailureHandler(function(err) {
@@ -1250,20 +1311,64 @@
           btn.textContent = 'Login';
           errEl.textContent = 'Error: ' + err.message;
         })
-        .verifyAdminPin(email, pin);
+        .adminLoginWithPassword(email, password);
     }
 
-    function closeAdminLogin() {
-      document.getElementById('admin-login-modal').classList.remove('open');
-      // Navigate back to booking page if admin was not authenticated
-      if (!isAdmin) switchPage('booking');
+    function doAdminRegister() {
+      const name     = document.getElementById('ar-name').value.trim();
+      const email    = document.getElementById('ar-email').value.trim();
+      const password = document.getElementById('ar-password').value;
+      const confirm  = document.getElementById('ar-confirm').value;
+      const errEl    = document.getElementById('ar-error');
+      const btn      = document.getElementById('ar-btn');
+
+      if (!name || !email || !password) { errEl.textContent = 'All fields are required.'; return; }
+      if (password !== confirm)          { errEl.textContent = 'Passwords do not match.'; return; }
+      if (password.length < 8)           { errEl.textContent = 'Password must be at least 8 characters.'; return; }
+      if (!/[A-Z]/.test(password))       { errEl.textContent = 'Password must contain at least one uppercase letter.'; return; }
+      if (!/[0-9]/.test(password))       { errEl.textContent = 'Password must contain at least one number.'; return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Registering…';
+      errEl.textContent = '';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'Register';
+          if (result.success) {
+            document.getElementById('ar-name').value = '';
+            document.getElementById('ar-password').value = '';
+            document.getElementById('ar-confirm').value = '';
+            document.getElementById('al-email').value = email;
+            showAdminView('login');
+            document.getElementById('al-error').style.color = 'var(--success)';
+            document.getElementById('al-error').textContent = '✅ ' + result.message;
+            setTimeout(() => { document.getElementById('al-error').style.color = 'var(--error)'; }, 5000);
+            document.getElementById('al-password').focus();
+          } else {
+            errEl.textContent = result.message;
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Register';
+          errEl.textContent = 'Error: ' + err.message;
+        })
+        .adminRegister(email, password, name);
     }
 
     function adminLogout() {
+      if (adminSessionToken) {
+        google.script.run.adminLogoutSession(adminSessionToken);
+      }
       isAdmin = false;
+      adminSessionToken = null;
+      adminName = '';
       document.getElementById('admin-status-bar').style.display = 'none';
-      document.getElementById('admin-logged-email').textContent = '';
-      switchPage('booking');
+      document.getElementById('admin-logged-name').textContent = '';
+      document.getElementById('admin-login-link-btn').style.display = '';
+      renderTable();
     }
 
     function selectVehicle(name, plate, imgSrc) {
@@ -1558,6 +1663,11 @@
     }
 
     function approveInApp(id, action) {
+      if (!adminSessionToken) {
+        showToast('Session expired. Please log in again.', 'error');
+        adminLogout();
+        return;
+      }
       const label = action === 'approve' ? 'approve' : 'reject';
       if (!confirm(`Are you sure you want to ${label} booking ${id}?`)) return;
 
@@ -1567,11 +1677,12 @@
         .withSuccessHandler(function(result) {
           showToast(result.message, result.success ? 'success' : 'error');
           if (result.success) setTimeout(() => loadBookings(), 1000);
+          if (!result.success && result.message && result.message.indexOf('expired') !== -1) adminLogout();
         })
         .withFailureHandler(function(err) {
           showToast('Error: ' + err.message, 'error');
         })
-        .approveRequestInApp(id, action);
+        .approveRequestInApp(id, action, adminSessionToken);
     }
 
     function showError(error) {
@@ -1585,6 +1696,7 @@
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
         closeModal();
+        closeAdminModal();
       }
     });
   </script>
