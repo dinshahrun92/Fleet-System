@@ -22,7 +22,8 @@ function doGet(e) {
   // Single file serves everything
   return HtmlService.createHtmlOutputFromFile("Index")
     .setTitle("AxiCom Fleet")
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0'); 
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function openSheet(name) {
