@@ -258,7 +258,27 @@ function sendApprovalEmail(id, data) {
   GmailApp.sendEmail(ADMIN_EMAILS, "Action Required: " + id, "", {htmlBody: html, cc: CC_EMAILS});
 }
 
-function processApproval(id, action) {
+function getCurrentUserEmail() {
+  var email = Session.getActiveUser().getEmail();
+  var adminList = ADMIN_EMAILS.split(",").map(function(e) { return e.trim().toLowerCase(); });
+  return {
+    email: email,
+    isAdmin: !!(email && adminList.indexOf(email.toLowerCase()) !== -1)
+  };
+}
+
+function approveRequestInApp(id, action) {
+  var userEmail = Session.getActiveUser().getEmail();
+  var adminList = ADMIN_EMAILS.split(",").map(function(e) { return e.trim().toLowerCase(); });
+  if (!userEmail || adminList.indexOf(userEmail.toLowerCase()) === -1) {
+    return {success: false, message: "Unauthorized: only admins can approve or reject requests."};
+  }
+  var result = processApproval(id, action, userEmail);
+  var succeeded = result && (result.indexOf("APPROVED") !== -1 || result.indexOf("REJECTED") !== -1);
+  return {success: succeeded, message: result};
+}
+
+function processApproval(id, action, processedBy) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return "System busy.";
   try {
@@ -271,8 +291,9 @@ function processApproval(id, action) {
         if (status !== "PENDING") return "Request " + id + " is already " + status;
         
         var newStatus = (action === "approve") ? "APPROVED" : "REJECTED";
+        var byLabel = processedBy ? "Admin (" + processedBy + ")" : "Admin (Email Link)";
         sheet.getRange(i+1, map['Status']+1).setValue(newStatus);
-        sheet.getRange(i+1, map['Processed By']+1).setValue("Admin (Email Link)"); 
+        sheet.getRange(i+1, map['Processed By']+1).setValue(byLabel);
         sheet.getRange(i+1, map['Processed Time']+1).setValue(new Date());
 
         // --- REQUESTER NOTIFICATION ---

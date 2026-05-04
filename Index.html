@@ -1147,6 +1147,15 @@
     let filteredBookings = [];
     let currentPage = 1;
     const recordsPerPage = 5;
+    let isAdmin = false;
+
+    // Check whether the currently logged-in user is an admin as soon as the page loads.
+    google.script.run
+      .withSuccessHandler(function(result) {
+        isAdmin = !!(result && result.isAdmin);
+      })
+      .withFailureHandler(function() { isAdmin = false; })
+      .getCurrentUserEmail();
 
     function switchPage(page) {
       document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
@@ -1308,9 +1317,13 @@
                   <span class="mobile-record-value">${booking.return}</span>
                 </div>
               </div>
-              ${canCancel ? `
+              ${canCancel || (isAdmin && booking.status === 'PENDING') ? `
                 <div class="mobile-record-actions">
-                  <button class="btn-action delete" onclick="cancelBooking('${booking.ID}')">Cancel Booking</button>
+                  ${canCancel ? `<button class="btn-action delete" onclick="cancelBooking('${booking.ID}')">Cancel Booking</button>` : ''}
+                  ${isAdmin && booking.status === 'PENDING' ? `
+                    <button class="btn-action" style="background:var(--success);color:white;" onclick="approveInApp('${booking.ID}','approve')">✅ Approve</button>
+                    <button class="btn-action" style="background:var(--error);color:white;" onclick="approveInApp('${booking.ID}','reject')">❌ Reject</button>
+                  ` : ''}
                 </div>
               ` : ''}
             </div>
@@ -1357,6 +1370,10 @@
                 ${canCancel ? `<button class="btn-action delete" onclick="cancelBooking('${booking.ID}')">Cancel</button>` : 
                   isPast && (booking.status === 'PENDING' || booking.status === 'APPROVED') ? 
                   `<span style="color: var(--text-muted); font-size: 12px;">Completed</span>` : ''}
+                ${isAdmin && booking.status === 'PENDING' ? `
+                  <button class="btn-action" style="background:var(--success);color:white;margin-left:4px;" onclick="approveInApp('${booking.ID}','approve')">✅ Approve</button>
+                  <button class="btn-action" style="background:var(--error);color:white;margin-left:4px;" onclick="approveInApp('${booking.ID}','reject')">❌ Reject</button>
+                ` : ''}
               </td>
             </tr>
           `;
@@ -1443,6 +1460,23 @@
           showToast('Error: ' + err.message, 'error');
         })
         .cancelBooking(id);
+    }
+
+    function approveInApp(id, action) {
+      const label = action === 'approve' ? 'approve' : 'reject';
+      if (!confirm(`Are you sure you want to ${label} booking ${id}?`)) return;
+
+      showToast(`Processing ${label}...`);
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showToast(result.message, result.success ? 'success' : 'error');
+          if (result.success) setTimeout(() => loadBookings(), 1000);
+        })
+        .withFailureHandler(function(err) {
+          showToast('Error: ' + err.message, 'error');
+        })
+        .approveRequestInApp(id, action);
     }
 
     function showError(error) {
